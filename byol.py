@@ -30,16 +30,18 @@ class EarlyStoppingWithSkip(EarlyStopping):
         else:
             self._run_early_stopping_check(trainer, pl_module)
 
+
 class RandomApply(nn.Module):
     def __init__(self, proc, p):
         super().__init__()
-        self.proc = proc 
+        self.proc = proc
         self.p = p
 
     def forward(self, x):
         if random.random() > self.p:
             return x
         return self.proc(x)
+
 
 def default_augmentation(image_size, is_color_image=True):
     def get_kernel_size(image_size):
@@ -50,20 +52,24 @@ def default_augmentation(image_size, is_color_image=True):
 
     def color_model(gaussian_p, solarize_p):
         return nn.Sequential(
-                RandomResizedCrop((image_size, image_size), interpolation="BICUBIC"),
-                RandomHorizontalFlip(),
-                ColorJitter(0.4, 0.4, 0.2, 0.1, p=0.8),
-                RandomGrayscale(p=0.2),
-                RandomApply(GaussianBlur2d(get_kernel_size(image_size), (0.1, 2.0)), p=gaussian_p),
-                RandomSolarize(0, 0, p=solarize_p)
+            RandomResizedCrop((image_size, image_size),
+                              interpolation="BICUBIC"),
+            RandomHorizontalFlip(),
+            ColorJitter(0.4, 0.4, 0.2, 0.1, p=0.8),
+            RandomGrayscale(p=0.2),
+            RandomApply(GaussianBlur2d(get_kernel_size(
+                image_size), (0.1, 2.0)), p=gaussian_p),
+            RandomSolarize(0, 0, p=solarize_p)
         )
-    
+
     def monochrome_model(gaussian_p, solarize_p):
         return nn.Sequential(
-                RandomResizedCrop((image_size, image_size), interpolation="BICUBIC"),
-                RandomHorizontalFlip(),
-                RandomApply(GaussianBlur2d(get_kernel_size(image_size), (0.1, 2.0)), p=gaussian_p),
-                RandomSolarize(0, 0, p=solarize_p)
+            RandomResizedCrop((image_size, image_size),
+                              interpolation="BICUBIC"),
+            RandomHorizontalFlip(),
+            RandomApply(GaussianBlur2d(get_kernel_size(
+                image_size), (0.1, 2.0)), p=gaussian_p),
+            RandomSolarize(0, 0, p=solarize_p)
         )
 
     if is_color_image:
@@ -71,18 +77,21 @@ def default_augmentation(image_size, is_color_image=True):
     else:
         return [monochrome_model(*ps) for ps in [(1., 0.), (0.1, 0.2)]]
 
+
 class TargetNetworkUpdator(pl.Callback):
     def __init__(self, tau_base=0.996):
         super().__init__()
         self.tau_base = tau_base
-    
+
     def on_train_batch_end(self, trainer, pl_module, batch, batch_idx, dataloader_idx):
         reference_model, target_model = pl_module.online_encoder, pl_module.target_encoder
         max_steps = len(trainer.train_dataloader) * trainer.max_epochs
         progress = pl_module.global_step / max_steps
         tau = 1 - (1 - self.tau_base) * math.cos(math.pi * progress) * 0.5
         for ref_params, target_params in zip(reference_model.parameters(), target_model.parameters()):
-            target_params.data = ref_params.data * (1 - tau) + target_params.data * tau
+            target_params.data = ref_params.data * \
+                (1 - tau) + target_params.data * tau
+
 
 class MLP(nn.Module):
     def __init__(self, isize, hsize, osize):
@@ -96,6 +105,7 @@ class MLP(nn.Module):
 
     def forward(self, x):
         return self.net(x)
+
 
 class BYOL(pl.LightningModule):
     def __init__(self,
@@ -112,9 +122,9 @@ class BYOL(pl.LightningModule):
                  ):
         super().__init__()
         self.save_hyperparameters()
-        assert(base_model is not None)
-        assert(isinstance(base_model, nn.Module))
-        assert(augmentation is not None)
+        assert base_model is not None
+        assert isinstance(base_model, nn.Module)
+        assert augmentation is not None
 
         self.augment = augmentation
 
@@ -122,10 +132,10 @@ class BYOL(pl.LightningModule):
         self.predictor = MLP(projector_osize, predictor_hsize, projector_osize)
         self.online_encoder = nn.Sequential(base_model, projector)
         self.target_encoder = copy.deepcopy(self.online_encoder)
-    
+
     def forward(self, x):
         return self.online_encoder[0](x)
-    
+
     def calc_loss(self, x):
         def proc(x, y):
             out_online = self.predictor(self.online_encoder(x))
@@ -164,7 +174,8 @@ class BYOL(pl.LightningModule):
         return results
 
     def configure_optimizers(self):
-        optimizer = AdamW(self.parameters(), lr=self.hparams.learning_rate, weight_decay=self.hparams.weight_decay)
+        optimizer = AdamW(self.parameters(
+        ), lr=self.hparams.learning_rate, weight_decay=self.hparams.weight_decay)
         optimizer = LARSWrapper(optimizer)
         scheduler = LinearWarmupCosineAnnealingLR(
             optimizer,
@@ -173,7 +184,7 @@ class BYOL(pl.LightningModule):
         )
         return [optimizer], [scheduler]
 
-    @classmethod 
+    @classmethod
     def extract_kwargs_from_argparse_args(cls, args, **kwargs):
         return extract_kwargs_from_argparse_args(cls, args, **kwargs)
 
