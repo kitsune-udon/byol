@@ -1,7 +1,6 @@
 import pytorch_lightning as pl
 import torch
 from torch.utils.data import DataLoader
-from torch.utils.data.dataloader import DataLoader
 from torchvision import transforms
 from torchvision.datasets import MNIST
 
@@ -29,9 +28,6 @@ class MNISTDataModule(pl.LightningDataModule):
 
     def prepare_data(self, *args, **kwargs):
         MNIST(self.dataset_root, download=True)
-
-    def setup(self, step):
-        pass
 
     def train_dataloader(self, *args, **kwargs):
         mnist_train = MNIST(self.dataset_root, train=True,
