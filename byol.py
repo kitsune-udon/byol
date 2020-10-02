@@ -34,12 +34,14 @@ class EarlyStoppingWithSkip(EarlyStopping):
 class RandomApply(nn.Module):
     def __init__(self, proc, p):
         super().__init__()
+
         self.proc = proc
         self.p = p
 
     def forward(self, x):
         if random.random() > self.p:
             return x
+
         return self.proc(x)
 
 
@@ -48,6 +50,7 @@ def default_augmentation(image_size, is_color_image=True):
         kernel_size = image_size // 10
         kernel_size = kernel_size + 1 if kernel_size % 2 == 0 else kernel_size
         kernel_size = (kernel_size, kernel_size)
+
         return kernel_size
 
     def color_model(gaussian_p, solarize_p):
@@ -81,21 +84,28 @@ def default_augmentation(image_size, is_color_image=True):
 class TargetNetworkUpdator(pl.Callback):
     def __init__(self, tau_base=0.996):
         super().__init__()
+
         self.tau_base = tau_base
 
     def on_train_batch_end(self, trainer, pl_module, batch, batch_idx, dataloader_idx):
-        reference_model, target_model = pl_module.online_encoder, pl_module.target_encoder
         max_steps = len(trainer.train_dataloader) * trainer.max_epochs
         progress = pl_module.global_step / max_steps
+
         tau = 1 - (1 - self.tau_base) * math.cos(math.pi * progress) * 0.5
-        for ref_params, target_params in zip(reference_model.parameters(), target_model.parameters()):
-            target_params.data = ref_params.data * \
-                (1 - tau) + target_params.data * tau
+
+        m = [[pl_module.online_encoder, pl_module.target_encoder],
+             [pl_module.online_projector, pl_module.target_projector]]
+
+        for n in m:
+            for src, dst in zip(n[0].parameters(), n[1].parameters()):
+                dst.data = src.data * \
+                    (1 - tau) + dst.data * tau
 
 
 class MLP(nn.Module):
     def __init__(self, isize, hsize, osize):
         super().__init__()
+
         self.net = nn.Sequential(
             nn.Linear(isize, hsize),
             nn.BatchNorm1d(hsize),
@@ -109,8 +119,7 @@ class MLP(nn.Module):
 
 class BYOL(pl.LightningModule):
     def __init__(self,
-                 base_model=None,
-                 augmentation=None,
+                 *args,
                  projector_isize=None,
                  projector_hsize=None,
                  projector_osize=None,
@@ -118,29 +127,30 @@ class BYOL(pl.LightningModule):
                  learning_rate=1e-3,
                  weight_decay=1.5e-6,
                  warmup_epochs=10,
-                 max_epochs=1000
+                 max_epochs=1000,
+                 **kwargs
                  ):
-        super().__init__()
+        super().__init__(*args, **kwargs)
         self.save_hyperparameters()
-        assert base_model is not None
-        assert isinstance(base_model, nn.Module)
-        assert augmentation is not None
-
-        self.augment = augmentation
-
-        projector = MLP(projector_isize, projector_hsize, projector_osize)
+        self.online_projector = MLP(
+            projector_isize, projector_hsize, projector_osize)
         self.predictor = MLP(projector_osize, predictor_hsize, projector_osize)
-        self.online_encoder = nn.Sequential(base_model, projector)
+
+    def copy(self):
         self.target_encoder = copy.deepcopy(self.online_encoder)
+        self.target_projector = copy.deepcopy(self.online_projector)
 
     def forward(self, x):
-        return self.online_encoder[0](x)
+        return self.online_encoder(x)
 
     def calc_loss(self, x):
         def proc(x, y):
-            out_online = self.predictor(self.online_encoder(x))
+            out_online = self.predictor(
+                self.online_projector(self.online_encoder(x)))
+
             with torch.no_grad():
-                out_target = self.target_encoder(y)
+                out_target = self.target_projector(self.target_encoder(y))
+
             return -2 * F.cosine_similarity(out_online, out_target.detach(), dim=-1).mean()
 
         if isinstance(self.augment, nn.Module):
@@ -154,34 +164,44 @@ class BYOL(pl.LightningModule):
 
     def training_step(self, batch, batch_idx):
         x, _ = batch
+
         return self.calc_loss(x)
 
     def validation_step(self, batch, batch_idx):
         x, label = batch
+
         with torch.no_grad():
-            y = self.online_encoder[0](x)
+            y = self.online_encoder(x)
+
         return {'representation': y, 'label': label}
 
     def validation_epoch_end(self, outputs):
         ys = torch.cat([o['representation'] for o in outputs]).cpu().numpy()
         labels = torch.cat([o['label'] for o in outputs]).cpu().numpy()
         half_idx = len(ys) // 2
+
         classifier = LogisticRegression(max_iter=100, solver="liblinear")
+
         classifier.fit(ys[:half_idx], labels[:half_idx])
         val_acc = 100 * classifier.score(ys[half_idx:], labels[half_idx:])
+
         logs = {'val_acc': torch.tensor(val_acc)}
         results = {'log': logs}
+
         return results
 
     def configure_optimizers(self):
-        optimizer = AdamW(self.parameters(
-        ), lr=self.hparams.learning_rate, weight_decay=self.hparams.weight_decay)
+        optimizer = AdamW(self.parameters(),
+                          lr=self.hparams.learning_rate,
+                          weight_decay=self.hparams.weight_decay)
         optimizer = LARSWrapper(optimizer)
+
         scheduler = LinearWarmupCosineAnnealingLR(
             optimizer,
             warmup_epochs=self.hparams.warmup_epochs,
             max_epochs=self.hparams.max_epochs
         )
+
         return [optimizer], [scheduler]
 
     @classmethod
@@ -193,4 +213,5 @@ class BYOL(pl.LightningModule):
         parser.add_argument('--learning_rate', type=float, default=1e-3)
         parser.add_argument('--weight_decay', type=float, default=1.5e-6)
         parser.add_argument('--warmup_epochs', type=int, default=10)
+
         return parser

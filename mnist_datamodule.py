@@ -15,16 +15,19 @@ def mnist_collate_fn(batch):
 
 
 class MNISTDataModule(pl.LightningDataModule):
-    def __init__(self, dataset_root="./dataset", train_batch_size=8, val_batch_size=8, num_workers=0):
+    def __init__(self, dataset_root="./dataset",
+                 train_batch_size=8, val_batch_size=8, num_workers=0):
         super().__init__()
+
         self.dataset_root = dataset_root
+        self.train_batch_size = train_batch_size
+        self.val_batch_size = val_batch_size
+        self.num_workers = num_workers
+
         self.transform = transforms.Compose([
             transforms.ToTensor(),
             transforms.Normalize((0.137,), (0.3081,))
         ])
-        self.train_batch_size = train_batch_size
-        self.val_batch_size = val_batch_size
-        self.num_workers = num_workers
 
     def prepare_data(self, *args, **kwargs):
         MNIST(self.dataset_root, download=True)
@@ -32,12 +35,14 @@ class MNISTDataModule(pl.LightningDataModule):
     def train_dataloader(self, *args, **kwargs):
         mnist_train = MNIST(self.dataset_root, train=True,
                             download=False, transform=self.transform)
+
         return DataLoader(mnist_train, shuffle=True, num_workers=self.num_workers,
                           batch_size=self.train_batch_size, collate_fn=mnist_collate_fn)
 
     def val_dataloader(self, *args, **kwargs):
         mnist_val = MNIST(self.dataset_root, train=False,
                           download=False, transform=self.transform)
+
         return DataLoader(mnist_val, shuffle=False, num_workers=self.num_workers,
                           batch_size=self.val_batch_size, collate_fn=mnist_collate_fn)
 
@@ -51,6 +56,7 @@ class MNISTDataModule(pl.LightningDataModule):
                             help="number of processes for dataloader")
         parser.add_argument("--dataset_root", type=str,
                             default="./dataset", help="root path of dataset")
+
         return parser
 
     @classmethod
