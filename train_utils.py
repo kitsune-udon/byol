@@ -1,4 +1,5 @@
 from argparse import ArgumentParser
+from warnings import warn
 
 import pytorch_lightning as pl
 from pytorch_lightning.callbacks import ModelCheckpoint
@@ -7,6 +8,10 @@ from pytorch_lightning.utilities.seed import seed_everything
 
 from byol import TargetNetworkUpdator
 
+def validate_args(args):
+    distributed = args.num_nodes > 1 or args.distributed_backend is not None
+    if args.seed is None and distributed:
+        warn("In a distributed running, '--seed' option must be specified.")
 
 def main(dm_cls, model_cls, model_args, logger_name):
     parser = ArgumentParser()
@@ -17,6 +22,7 @@ def main(dm_cls, model_cls, model_args, logger_name):
     args = parser.parse_args()
     print(args)
 
+    validate_args(args)
     seed_everything(args.seed)
 
     dm = dm_cls.from_argparse_args(args)
