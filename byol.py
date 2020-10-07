@@ -165,7 +165,7 @@ class BYOL(pl.LightningModule):
     def training_step(self, batch, batch_idx):
         x, _ = batch
 
-        return self.calc_loss(x)
+        return {'loss': self.calc_loss(x)}
 
     def validation_step(self, batch, batch_idx):
         x, label = batch
