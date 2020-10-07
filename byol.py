@@ -106,9 +106,9 @@ class MLP(nn.Module):
         super().__init__()
 
         self.net = nn.Sequential(
-            nn.Linear(isize, hsize),
+            nn.Linear(isize, hsize, bias=False),
             nn.BatchNorm1d(hsize),
-            nn.ReLU(),
+            nn.ReLU(inplace=True),
             nn.Linear(hsize, osize)
         )
 
