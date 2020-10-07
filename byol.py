@@ -88,10 +88,9 @@ class TargetNetworkUpdator(pl.Callback):
         self.tau_base = tau_base
 
     def on_train_batch_end(self, trainer, pl_module, batch, batch_idx, dataloader_idx):
-        max_steps = len(trainer.train_dataloader) * trainer.max_epochs
-        progress = pl_module.global_step / max_steps
+        progress = trainer.current_epoch / trainer.max_epochs
 
-        tau = 1 - (1 - self.tau_base) * math.cos(math.pi * progress) * 0.5
+        tau = 1 - (1 - self.tau_base) * (math.cos(math.pi * progress) + 1) * 0.5
 
         m = [[pl_module.online_encoder, pl_module.target_encoder],
              [pl_module.online_projector, pl_module.target_projector]]
