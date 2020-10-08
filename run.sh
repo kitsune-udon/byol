@@ -2,7 +2,7 @@
 
 PROG=$1
 
-BATCHSIZE=$2
+BATCHSIZE=64
 
 ARGS="--seed=1 \
       --gpus=1 \
