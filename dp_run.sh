@@ -8,6 +8,7 @@ COMMON_ARGS="--distributed_backend=dp \
               --num_workers=4 \
               --train_batch_size=$TOTAL_BS \
               --val_batch_size=$TOTAL_BS \
-              --sync_batchnorm=1"
+              --sync_batchnorm=1
+              --warmup_epochs=5"
 MASTER_ADDR=localhost MASTER_PORT=12345 \
   python3 $PROG $COMMON_ARGS

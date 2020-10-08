@@ -138,10 +138,10 @@ class BYOL(pl.LightningModule):
                  projector_hsize=None,
                  projector_osize=None,
                  predictor_hsize=None,
-                 learning_rate=1e-3,
-                 weight_decay=1.5e-6,
-                 warmup_epochs=10,
-                 max_epochs=1000,
+                 learning_rate=None,
+                 weight_decay=None,
+                 warmup_epochs=None,
+                 max_epochs=None,
                  **kwargs
                  ):
         super().__init__(*args, **kwargs)
@@ -215,8 +215,7 @@ class BYOL(pl.LightningModule):
         scheduler = LinearWarmupCosineAnnealingLR(
             optimizer,
             warmup_epochs=self.hparams.warmup_epochs,
-            max_epochs=self.hparams.max_epochs
-        )
+            max_epochs=self.hparams.max_epochs)
 
         return [optimizer], [scheduler]
 
@@ -227,7 +226,7 @@ class BYOL(pl.LightningModule):
     @staticmethod
     def add_argparse_args(parser):
         parser.add_argument('--learning_rate', type=float, default=1e-3)
-        parser.add_argument('--weight_decay', type=float, default=1.5e-6)
+        parser.add_argument('--weight_decay', type=float, default=1e-2)
         parser.add_argument('--warmup_epochs', type=int, default=10)
 
         return parser
