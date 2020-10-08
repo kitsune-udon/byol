@@ -11,7 +11,7 @@ class BYOLSTL10(BYOL):
         super().__init__(*args, **kwargs)
         self.augment = default_augmentation(96, is_color_image=True)
         mobilenet = torch.hub.load(
-            'pytorch/vision:v0.6.0', 'mobilenet_v2', pretrained=True)
+            'pytorch/vision:v0.6.0', 'mobilenet_v2', pretrained=False)
         mobilenet.classifier = nn.Identity()
         self.online_encoder = mobilenet
         self.copy()
