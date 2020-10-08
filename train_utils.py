@@ -46,7 +46,8 @@ def main(dm_cls, model_cls, model_args, logger_name):
     trainer = pl.Trainer.from_argparse_args(args,
                                             deterministic=True,
                                             callbacks=[
-                                                TargetNetworkUpdator(), PredictorInitializer()],
+                                                TargetNetworkUpdator(),
+                                                PredictorInitializer()],
                                             checkpoint_callback=checkpoint,
                                             logger=logger
                                             )

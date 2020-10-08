@@ -37,15 +37,21 @@ class STL10DataModule(pl.LightningDataModule):
         stl10_train = STL10(self.dataset_root, split='train+unlabeled',
                             download=False, transform=self.transform)
 
-        return DataLoader(stl10_train, shuffle=True, num_workers=self.num_workers,
-                          batch_size=self.train_batch_size, collate_fn=stl10_collate_fn)
+        return DataLoader(stl10_train,
+                          shuffle=True,
+                          num_workers=self.num_workers,
+                          batch_size=self.train_batch_size,
+                          collate_fn=stl10_collate_fn)
 
     def val_dataloader(self, *args, **kwargs):
         stl10_val = STL10(self.dataset_root, split='test',
                           download=False, transform=self.transform)
 
-        return DataLoader(stl10_val, shuffle=False, num_workers=self.num_workers,
-                          batch_size=self.val_batch_size, collate_fn=stl10_collate_fn)
+        return DataLoader(stl10_val,
+                          shuffle=False,
+                          num_workers=self.num_workers,
+                          batch_size=self.val_batch_size,
+                          collate_fn=stl10_collate_fn)
 
     @staticmethod
     def add_argparse_args(parser):

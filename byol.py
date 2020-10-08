@@ -87,7 +87,8 @@ class TargetNetworkUpdator(pl.Callback):
 
         self.tau_base = tau_base
 
-    def on_train_batch_end(self, trainer, pl_module, batch, batch_idx, dataloader_idx):
+    def on_train_batch_end(self, trainer, pl_module,
+                           batch, batch_idx, dataloader_idx):
         progress = trainer.current_epoch / trainer.max_epochs
 
         tau = 1 - (1 - self.tau_base) * \
@@ -164,7 +165,9 @@ class BYOL(pl.LightningModule):
             with torch.no_grad():
                 out_target = self.target_projector(self.target_encoder(y))
 
-            return -2 * F.cosine_similarity(out_online, out_target.detach(), dim=-1).mean()
+            return -2 * F.cosine_similarity(out_online,
+                                            out_target.detach(),
+                                            dim=-1).mean()
 
         if isinstance(self.augment, nn.Module):
             imgs = [self.augment(x), self.augment(x)]
