@@ -90,7 +90,8 @@ class TargetNetworkUpdator(pl.Callback):
     def on_train_batch_end(self, trainer, pl_module, batch, batch_idx, dataloader_idx):
         progress = trainer.current_epoch / trainer.max_epochs
 
-        tau = 1 - (1 - self.tau_base) * (math.cos(math.pi * progress) + 1) * 0.5
+        tau = 1 - (1 - self.tau_base) * \
+            (math.cos(math.pi * progress) + 1) * 0.5
 
         m = [[pl_module.online_encoder, pl_module.target_encoder],
              [pl_module.online_projector, pl_module.target_projector]]
@@ -99,6 +100,20 @@ class TargetNetworkUpdator(pl.Callback):
             for src, dst in zip(n[0].parameters(), n[1].parameters()):
                 dst.data = src.data * \
                     (1 - tau) + dst.data * tau
+
+
+class PredictorInitializer(pl.Callback):
+    def __init__(self, step=10, max_value=0.01):
+        super().__init__()
+
+        self.step = step
+        self.max_value = max_value
+
+    def on_epoch_start(self, trainer, pl_module):
+        if trainer.current_epoch % self.step == 0:
+            for p in pl_module.predictor.parameters():
+                torch.rand(*p.data.size(), out=p.data)
+                p.data *= self.max_value
 
 
 class MLP(nn.Module):
