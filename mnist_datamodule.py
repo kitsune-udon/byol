@@ -36,15 +36,21 @@ class MNISTDataModule(pl.LightningDataModule):
         mnist_train = MNIST(self.dataset_root, train=True,
                             download=False, transform=self.transform)
 
-        return DataLoader(mnist_train, shuffle=True, num_workers=self.num_workers,
-                          batch_size=self.train_batch_size, collate_fn=mnist_collate_fn)
+        return DataLoader(mnist_train,
+                          shuffle=True,
+                          num_workers=self.num_workers,
+                          batch_size=self.train_batch_size,
+                          collate_fn=mnist_collate_fn)
 
     def val_dataloader(self, *args, **kwargs):
         mnist_val = MNIST(self.dataset_root, train=False,
                           download=False, transform=self.transform)
 
-        return DataLoader(mnist_val, shuffle=False, num_workers=self.num_workers,
-                          batch_size=self.val_batch_size, collate_fn=mnist_collate_fn)
+        return DataLoader(mnist_val,
+                          shuffle=False,
+                          num_workers=self.num_workers,
+                          batch_size=self.val_batch_size,
+                          collate_fn=mnist_collate_fn)
 
     @staticmethod
     def add_argparse_args(parser):
