@@ -112,8 +112,7 @@ class PredictorInitializer(pl.Callback):
     def on_epoch_start(self, trainer, pl_module):
         if trainer.current_epoch % self.step == 0:
             for p in pl_module.predictor.parameters():
-                torch.rand(*p.data.size(), out=p.data)
-                p.data *= self.max_value
+                p.data = torch.rand_like(p.data) * self.max_value
 
 
 class MLP(nn.Module):
