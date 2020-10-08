@@ -9,23 +9,10 @@ from kornia.augmentation import (ColorJitter, RandomGrayscale,
                                  RandomHorizontalFlip, RandomResizedCrop,
                                  RandomSolarize)
 from kornia.filters import GaussianBlur2d
-from pytorch_lightning.callbacks import EarlyStopping
 from sklearn.linear_model import LogisticRegression
 from torch.optim import SGD
 
 from argparse_utils import extract_kwargs_from_argparse_args
-
-
-class EarlyStoppingWithSkip(EarlyStopping):
-    def __init__(self, *args, **kwargs):
-        self.n_epochs = kwargs.pop('n_epochs')
-        super().__init__(*args, **kwargs)
-
-    def on_validation_end(self, trainer, pl_module):
-        if trainer.current_epoch < self.n_epochs:
-            pass
-        else:
-            self._run_early_stopping_check(trainer, pl_module)
 
 
 class RandomApply(nn.Module):
