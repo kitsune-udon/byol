@@ -1,5 +1,4 @@
 import copy
-import math
 import random
 
 import pytorch_lightning as pl
@@ -10,11 +9,9 @@ from kornia.augmentation import (ColorJitter, RandomGrayscale,
                                  RandomHorizontalFlip, RandomResizedCrop,
                                  RandomSolarize)
 from kornia.filters import GaussianBlur2d
-from pl_bolts.optimizers.lars_scheduling import LARSWrapper
-from pl_bolts.optimizers.lr_scheduler import LinearWarmupCosineAnnealingLR
 from pytorch_lightning.callbacks import EarlyStopping
 from sklearn.linear_model import LogisticRegression
-from torch.optim import AdamW
+from torch.optim import SGD
 
 from argparse_utils import extract_kwargs_from_argparse_args
 
@@ -82,25 +79,20 @@ def default_augmentation(image_size, is_color_image=True):
 
 
 class TargetNetworkUpdator(pl.Callback):
-    def __init__(self, tau_base=0.996):
+    def __init__(self, tau=0.996):
         super().__init__()
 
-        self.tau_base = tau_base
+        self.tau = tau
 
     def on_train_batch_end(self, trainer, pl_module,
                            batch, batch_idx, dataloader_idx):
-        progress = trainer.current_epoch / trainer.max_epochs
-
-        tau = 1 - (1 - self.tau_base) * \
-            (math.cos(math.pi * progress) + 1) * 0.5
-
         m = [[pl_module.online_encoder, pl_module.target_encoder],
              [pl_module.online_projector, pl_module.target_projector]]
 
         for n in m:
             for src, dst in zip(n[0].parameters(), n[1].parameters()):
                 dst.data = src.data * \
-                    (1 - tau) + dst.data * tau
+                    (1 - self.tau) + dst.data * self.tau
 
 
 class PredictorInitializer(pl.Callback):
@@ -140,8 +132,6 @@ class BYOL(pl.LightningModule):
                  predictor_hsize=None,
                  learning_rate=None,
                  weight_decay=None,
-                 warmup_epochs=None,
-                 max_epochs=None,
                  **kwargs
                  ):
         super().__init__(*args, **kwargs)
@@ -180,8 +170,9 @@ class BYOL(pl.LightningModule):
 
     def training_step(self, batch, batch_idx):
         x, _ = batch
+        loss = self.calc_loss(x)
 
-        return {'loss': self.calc_loss(x)}
+        return {'loss': loss, 'log': {'train_loss': loss}}
 
     def validation_step(self, batch, batch_idx):
         x, label = batch
@@ -207,17 +198,12 @@ class BYOL(pl.LightningModule):
         return results
 
     def configure_optimizers(self):
-        optimizer = AdamW(self.parameters(),
-                          lr=self.hparams.learning_rate,
-                          weight_decay=self.hparams.weight_decay)
-        optimizer = LARSWrapper(optimizer)
+        optimizer = SGD(self.parameters(),
+                        lr=self.hparams.learning_rate,
+                        momentum=0.9,
+                        weight_decay=self.hparams.weight_decay)
 
-        scheduler = LinearWarmupCosineAnnealingLR(
-            optimizer,
-            warmup_epochs=self.hparams.warmup_epochs,
-            max_epochs=self.hparams.max_epochs)
-
-        return [optimizer], [scheduler]
+        return [optimizer]
 
     @classmethod
     def extract_kwargs_from_argparse_args(cls, args, **kwargs):
@@ -225,8 +211,7 @@ class BYOL(pl.LightningModule):
 
     @staticmethod
     def add_argparse_args(parser):
-        parser.add_argument('--learning_rate', type=float, default=1e-3)
-        parser.add_argument('--weight_decay', type=float, default=1e-2)
-        parser.add_argument('--warmup_epochs', type=int, default=10)
+        parser.add_argument('--learning_rate', type=float, default=0.03)
+        parser.add_argument('--weight_decay', type=float, default=4e-4)
 
         return parser
