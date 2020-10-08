@@ -10,17 +10,17 @@ class BYOLSTL10(BYOL):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.augment = default_augmentation(96, is_color_image=True)
-        mobilenet = torch.hub.load(
-            'pytorch/vision:v0.6.0', 'mobilenet_v2', pretrained=False)
-        mobilenet.classifier = nn.Identity()
-        self.online_encoder = mobilenet
+        resnet18 = torch.hub.load(
+            'pytorch/vision:v0.6.0', 'resnet18', pretrained=False)
+        resnet18.fc = nn.Identity()
+        self.online_encoder = resnet18
         self.copy()
 
 
 byol_args = {
-    "projector_isize": 1280,
-    "projector_hsize": 2560,
-    "projector_osize": 256,
+    "projector_isize": 512,
+    "projector_hsize": 512,
+    "projector_osize": 128,
     "predictor_hsize": 512
 }
 
