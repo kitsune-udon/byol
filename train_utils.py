@@ -6,7 +6,7 @@ from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers import TensorBoardLogger
 from pytorch_lightning.utilities.seed import seed_everything
 
-from byol import PredictorInitializer, TargetNetworkUpdator
+from byol import TargetNetworkUpdator
 
 
 def validate_args(args):
@@ -45,9 +45,7 @@ def main(dm_cls, model_cls, model_args, logger_name):
 
     trainer = pl.Trainer.from_argparse_args(args,
                                             deterministic=True,
-                                            callbacks=[
-                                                TargetNetworkUpdator(),
-                                                PredictorInitializer()],
+                                            callbacks=[TargetNetworkUpdator()],
                                             checkpoint_callback=checkpoint,
                                             logger=logger
                                             )
