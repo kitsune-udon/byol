@@ -9,6 +9,7 @@ from kornia.augmentation import (ColorJitter, RandomGrayscale,
                                  RandomHorizontalFlip, RandomResizedCrop,
                                  RandomSolarize)
 from kornia.filters import GaussianBlur2d
+from pl_bolts.optimizers import LARSWrapper, LinearWarmupCosineAnnealingLR
 from sklearn.linear_model import LogisticRegression
 from torch.optim import SGD
 
@@ -73,13 +74,13 @@ class TargetNetworkUpdator(pl.Callback):
 
     def on_train_batch_end(self, trainer, pl_module,
                            batch, batch_idx, dataloader_idx):
-        m = [[pl_module.online_encoder, pl_module.target_encoder],
-             [pl_module.online_projector, pl_module.target_projector]]
+        def update(src, dst):
+            for sp, dp in zip(src.parameters(), dst.parameters()):
+                dp.data = sp.data * \
+                    (1 - self.tau) + dp.data * self.tau
 
-        for n in m:
-            for src, dst in zip(n[0].parameters(), n[1].parameters()):
-                dst.data = src.data * \
-                    (1 - self.tau) + dst.data * self.tau
+        update(pl_module.online_encoder, pl_module.target_encoder)
+        update(pl_module.online_projector, pl_module.target_projector)
 
 
 class PredictorInitializer(pl.Callback):
@@ -119,6 +120,8 @@ class BYOL(pl.LightningModule):
                  predictor_hsize=None,
                  learning_rate=None,
                  weight_decay=None,
+                 max_epochs=None,
+                 warmup_epochs=None,
                  **kwargs
                  ):
         super().__init__(*args, **kwargs)
@@ -189,8 +192,13 @@ class BYOL(pl.LightningModule):
                         lr=self.hparams.learning_rate,
                         momentum=0.9,
                         weight_decay=self.hparams.weight_decay)
+        optimizer = LARSWrapper(optimizer)
 
-        return [optimizer]
+        scheduler = LinearWarmupCosineAnnealingLR(
+            optimizer, self.hparams.warmup_epochs, self.hparams.max_epochs,
+            warmup_start_lr=0.001, eta_min=0.001)
+
+        return [optimizer], [scheduler]
 
     @classmethod
     def extract_kwargs_from_argparse_args(cls, args, **kwargs):
@@ -198,7 +206,8 @@ class BYOL(pl.LightningModule):
 
     @staticmethod
     def add_argparse_args(parser):
-        parser.add_argument('--learning_rate', type=float, default=0.03)
-        parser.add_argument('--weight_decay', type=float, default=4e-4)
+        parser.add_argument('--learning_rate', type=float, default=0.2)
+        parser.add_argument('--weight_decay', type=float, default=1e-6)
+        parser.add_argument('--warmup_epochs', type=int, default=10)
 
         return parser
